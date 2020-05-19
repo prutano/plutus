@@ -1,0 +1,9 @@
+(lam x (con integer)
+(let
+  (rec)
+    (termbind (strict) (vardecl j (con integer)) (con 3))
+    (termbind (strict) (vardecl j (con integer)) (con 3))
+    (con 5)
+    )
+  )
+

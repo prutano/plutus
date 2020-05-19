@@ -8,18 +8,18 @@
               Plugin_Data_Spec_MyMonoData_i0
               (type)
               (lam
-                Plugin_Data_Spec_Mono1_i0
+                Plugin_Data_Spec_MonoA1_i0
                 (fun (con integer) (fun (con integer) Plugin_Data_Spec_MyMonoData_i2))
                 (lam
-                  Plugin_Data_Spec_Mono2_i0
+                  Plugin_Data_Spec_MonoB2_i0
                   (fun (con integer) Plugin_Data_Spec_MyMonoData_i3)
                   (lam
-                    Plugin_Data_Spec_Mono3_i0
+                    Plugin_Data_Spec_MonoC3_i0
                     (fun (con integer) Plugin_Data_Spec_MyMonoData_i4)
                     (lam
                       match_Plugin_Data_Spec_MyMonoData_i0
                       (fun Plugin_Data_Spec_MyMonoData_i5 (all out_Plugin_Data_Spec_MyMonoData_i0 (type) (fun (fun (con integer) (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i1)) (fun (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i1) (fun (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i1) out_Plugin_Data_Spec_MyMonoData_i1)))))
-                      [ Plugin_Data_Spec_Mono2_i3 (con 2) ]
+                      [ Plugin_Data_Spec_MonoB2_i3 (con 2) ]
                     )
                   )
                 )
@@ -37,15 +37,15 @@
                 out_Plugin_Data_Spec_MyMonoData_i0
                 (type)
                 (lam
-                  case_Plugin_Data_Spec_Mono1_i0
+                  case_Plugin_Data_Spec_MonoA1_i0
                   (fun (con integer) (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i2))
                   (lam
-                    case_Plugin_Data_Spec_Mono2_i0
+                    case_Plugin_Data_Spec_MonoB2_i0
                     (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i3)
                     (lam
-                      case_Plugin_Data_Spec_Mono3_i0
+                      case_Plugin_Data_Spec_MonoC3_i0
                       (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i4)
-                      [ [ case_Plugin_Data_Spec_Mono1_i3 arg_0_i6 ] arg_1_i5 ]
+                      [ [ case_Plugin_Data_Spec_MonoA1_i3 arg_0_i6 ] arg_1_i5 ]
                     )
                   )
                 )
@@ -60,15 +60,15 @@
             out_Plugin_Data_Spec_MyMonoData_i0
             (type)
             (lam
-              case_Plugin_Data_Spec_Mono1_i0
+              case_Plugin_Data_Spec_MonoA1_i0
               (fun (con integer) (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i2))
               (lam
-                case_Plugin_Data_Spec_Mono2_i0
+                case_Plugin_Data_Spec_MonoB2_i0
                 (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i3)
                 (lam
-                  case_Plugin_Data_Spec_Mono3_i0
+                  case_Plugin_Data_Spec_MonoC3_i0
                   (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i4)
-                  [ case_Plugin_Data_Spec_Mono2_i2 arg_0_i5 ]
+                  [ case_Plugin_Data_Spec_MonoB2_i2 arg_0_i5 ]
                 )
               )
             )
@@ -82,15 +82,15 @@
           out_Plugin_Data_Spec_MyMonoData_i0
           (type)
           (lam
-            case_Plugin_Data_Spec_Mono1_i0
+            case_Plugin_Data_Spec_MonoA1_i0
             (fun (con integer) (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i2))
             (lam
-              case_Plugin_Data_Spec_Mono2_i0
+              case_Plugin_Data_Spec_MonoB2_i0
               (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i3)
               (lam
-                case_Plugin_Data_Spec_Mono3_i0
+                case_Plugin_Data_Spec_MonoC3_i0
                 (fun (con integer) out_Plugin_Data_Spec_MyMonoData_i4)
-                [ case_Plugin_Data_Spec_Mono3_i1 arg_0_i5 ]
+                [ case_Plugin_Data_Spec_MonoC3_i1 arg_0_i5 ]
               )
             )
           )

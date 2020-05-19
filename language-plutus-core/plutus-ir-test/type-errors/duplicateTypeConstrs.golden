@@ -1,0 +1,3 @@
+Error during typechecking:
+A duplicate identifier is introduced inside a single datatype-bind of let at duplicateTypeConstrs:4:6
+Offending identifier: a

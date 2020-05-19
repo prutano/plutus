@@ -101,6 +101,7 @@ library
         Language.PlutusIR.Compiler
         Language.PlutusIR.Compiler.Names
         Language.PlutusIR.Compiler.Definitions
+        Language.PlutusIR.Compiler.Error
         Language.PlutusIR.Generators.AST
         Language.PlutusIR.Parser
         Language.PlutusIR.MkPir
@@ -111,6 +112,7 @@ library
         Language.PlutusIR.Transform.Rename
         Language.PlutusIR.Transform.NonStrict
         Language.PlutusIR.Transform.LetFloat
+        Language.PlutusIR.TypeCheck
 
         PlutusPrelude
         Common
@@ -170,13 +172,14 @@ library
 
         Language.PlutusIR.Analysis.Dependencies
         Language.PlutusIR.Analysis.Usages
-        Language.PlutusIR.Compiler.Error
         Language.PlutusIR.Compiler.Let
         Language.PlutusIR.Compiler.Datatype
         Language.PlutusIR.Compiler.Provenance
         Language.PlutusIR.Compiler.Recursion
         Language.PlutusIR.Compiler.Types
         Language.PlutusIR.Compiler.Lower
+        Language.PlutusIR.Normalize
+        Language.PlutusIR.TypeCheck.Internal
 
         Data.Aeson.THReader
         Data.Functor.Foldable.Monadic
@@ -301,6 +304,7 @@ test-suite plutus-ir-test
         OptimizerSpec
         TransformSpec
         ParserSpec
+        TypeSpec
         TestLib
     build-depends:
         base >=4.9 && <5,

@@ -6,9 +6,9 @@
         (tyvardecl MyEnum (type))
         
         MyEnum_match
-        (vardecl Enum MyEnum) (vardecl Enum MyEnum)
+        (vardecl EnumA MyEnum) (vardecl EnumB MyEnum)
       )
     )
-    Enum
+    EnumA
   )
 )

@@ -1,0 +1,14 @@
+(let
+  (nonrec)
+  (datatypebind
+    (datatype
+      (tyvardecl Maybe (fun (type) (type)))
+      (tyvardecl a (type))
+      match_Maybe
+      (vardecl Nothing [Maybe a])
+      -- here we wrap with a dummy typelambda to break the pir compiler
+      (vardecl Just [(lam x (type) (fun a [Maybe a])) (con integer)])
+    )
+  )
+  [{ Just (con integer) } (con 3)]
+)

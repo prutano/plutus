@@ -1,0 +1,14 @@
+(let
+  (nonrec)
+   (datatypebind
+    (datatype
+      (tyvardecl Either (fun (type) (fun (type) (type))))
+      (tyvardecl a (type))
+      (tyvardecl a (type))
+      match_Either
+      (vardecl Right (fun a [Either a a]))
+      (vardecl Left (fun a [Either a a]))
+    )
+  )
+  (con 5)
+)

@@ -50,31 +50,31 @@ monoData = testNested "monomorphic" [
   , goldenPir "synonym" synonym
   ]
 
-data MyEnum = Enum1 | Enum2
+data MyEnum = EnumA1 | EnumB2
 
 basicEnum :: CompiledCode PLC.DefaultUni MyEnum
-basicEnum = plc (Proxy @"basicEnum") Enum1
+basicEnum = plc (Proxy @"basicEnum") EnumA1
 
-data MyMonoData = Mono1 Integer Integer | Mono2 Integer | Mono3 Integer
+data MyMonoData = MonoA1 Integer Integer | MonoB2 Integer | MonoC3 Integer
     deriving (Show, Eq)
 
 monoDataType :: CompiledCode PLC.DefaultUni (MyMonoData -> MyMonoData)
 monoDataType = plc (Proxy @"monoDataType") (\(x :: MyMonoData) -> x)
 
 monoConstructor :: CompiledCode PLC.DefaultUni (Integer -> Integer -> MyMonoData)
-monoConstructor = plc (Proxy @"monConstructor") Mono1
+monoConstructor = plc (Proxy @"monConstructor") MonoA1
 
 monoConstructed :: CompiledCode PLC.DefaultUni MyMonoData
-monoConstructed = plc (Proxy @"monoConstructed") (Mono2 1)
+monoConstructed = plc (Proxy @"monoConstructed") (MonoB2 1)
 
 monoCase :: CompiledCode PLC.DefaultUni (MyMonoData -> Integer)
-monoCase = plc (Proxy @"monoCase") (\(x :: MyMonoData) -> case x of { Mono1 _ b -> b;  Mono2 a -> a; Mono3 a -> a })
+monoCase = plc (Proxy @"monoCase") (\(x :: MyMonoData) -> case x of { MonoA1 _ b -> b;  MonoB2 a -> a; MonoC3 a -> a })
 
 defaultCase :: CompiledCode PLC.DefaultUni (MyMonoData -> Integer)
-defaultCase = plc (Proxy @"defaultCase") (\(x :: MyMonoData) -> case x of { Mono3 a -> a ; _ -> 2; })
+defaultCase = plc (Proxy @"defaultCase") (\(x :: MyMonoData) -> case x of { MonoC3 a -> a ; _ -> 2; })
 
 irrefutableMatch :: CompiledCode PLC.DefaultUni (MyMonoData -> Integer)
-irrefutableMatch = plc (Proxy @"irrefutableMatch") (\(x :: MyMonoData) -> case x of { Mono2 a -> a })
+irrefutableMatch = plc (Proxy @"irrefutableMatch") (\(x :: MyMonoData) -> case x of { MonoB2 a -> a })
 
 atPattern :: CompiledCode PLC.DefaultUni ((Integer, Integer) -> Integer)
 atPattern = plc (Proxy @"atPattern") (\t@(x::Integer, y::Integer) -> let fst (a, b) = a in Builtins.addInteger y (fst t))
@@ -92,7 +92,7 @@ recordNewtype = plc (Proxy @"recordNewtype") (\(x :: RecordNewtype) -> x)
 
 -- must be compiled with a lazy case
 nonValueCase :: CompiledCode PLC.DefaultUni (MyEnum -> Integer)
-nonValueCase = plc (Proxy @"nonValueCase") (\(x :: MyEnum) -> case x of { Enum1 -> 1::Integer ; Enum2 -> Builtins.error (); })
+nonValueCase = plc (Proxy @"nonValueCase") (\(x :: MyEnum) -> case x of { EnumA1 -> 1::Integer ; EnumB2 -> Builtins.error (); })
 
 data StrictPattern a = StrictPattern !a !a
 
@@ -111,16 +111,16 @@ polyData = testNested "polymorphic" [
   , goldenPir "defaultCasePoly" defaultCasePoly
   ]
 
-data MyPolyData a b = Poly1 a b | Poly2 a
+data MyPolyData a b = PolyA1 a b | PolyB2 a
 
 polyDataType :: CompiledCode PLC.DefaultUni (MyPolyData Integer Integer -> MyPolyData Integer Integer)
 polyDataType = plc (Proxy @"polyDataType") (\(x:: MyPolyData Integer Integer) -> x)
 
 polyConstructed :: CompiledCode PLC.DefaultUni (MyPolyData Integer Integer)
-polyConstructed = plc (Proxy @"polyConstructed") (Poly1 (1::Integer) (2::Integer))
+polyConstructed = plc (Proxy @"polyConstructed") (PolyA1 (1::Integer) (2::Integer))
 
 defaultCasePoly :: CompiledCode PLC.DefaultUni (MyPolyData Integer Integer -> Integer)
-defaultCasePoly = plc (Proxy @"defaultCasePoly") (\(x :: MyPolyData Integer Integer) -> case x of { Poly1 a _ -> a ; _ -> 2; })
+defaultCasePoly = plc (Proxy @"defaultCasePoly") (\(x :: MyPolyData Integer Integer) -> case x of { PolyA1 a _ -> a ; _ -> 2; })
 
 newtypes :: TestNested
 newtypes = testNested "newtypes" [

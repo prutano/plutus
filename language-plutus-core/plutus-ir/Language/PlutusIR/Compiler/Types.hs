@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeOperators #-}
 module Language.PlutusIR.Compiler.Types where
 
 import qualified Language.PlutusIR                     as PIR
@@ -82,10 +83,12 @@ type PIRType uni a = PIR.Type PIR.TyName uni (Provenance a)
 type Compiling m e uni a =
     ( Monad m
     , MonadReader (CompilationCtx a) m
+    , AsTypeError e uni (Provenance a)
     , AsError e uni (Provenance a)
     , MonadError e m
     , MonadQuote m
     , Ord a
+    , PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni
     )
 
 type TermDef tyname name uni a = PLC.Def (PLC.VarDecl tyname name uni a) (PIR.Term tyname name uni a)

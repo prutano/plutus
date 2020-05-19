@@ -51,10 +51,10 @@ tests :: TestNested
 tests = testNested "Lift" [
     goldenPlc "int" (Lift.liftProgramDef (1::Integer))
     , goldenPlc "tuple" (Lift.liftProgramDef (1::Integer, 2::Integer))
-    , goldenPlc "mono" (Lift.liftProgramDef (Mono2 2))
-    , goldenEval "monoInterop" [ getPlc monoCase, Lift.liftProgramDef (Mono1 1 2) ]
-    , goldenPlc "poly" (Lift.liftProgramDef (Poly1 (1::Integer) (2::Integer)))
-    , goldenEval "polyInterop" [ getPlc defaultCasePoly, Lift.liftProgramDef (Poly1 (1::Integer) (2::Integer)) ]
+    , goldenPlc "mono" (Lift.liftProgramDef (MonoB2 2))
+    , goldenEval "monoInterop" [ getPlc monoCase, Lift.liftProgramDef (MonoA1 1 2) ]
+    , goldenPlc "poly" (Lift.liftProgramDef (PolyA1 (1::Integer) (2::Integer)))
+    , goldenEval "polyInterop" [ getPlc defaultCasePoly, Lift.liftProgramDef (PolyA1 (1::Integer) (2::Integer)) ]
     , goldenPlc "record" (Lift.liftProgramDef (MyMonoRecord 1 2))
     , goldenEval "boolInterop" [ getPlc andPlc, Lift.liftProgramDef True, Lift.liftProgramDef True ]
     , goldenPlc "list" (Lift.liftProgramDef ([1]::[Integer]))

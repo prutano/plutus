@@ -6,6 +6,7 @@ module Language.PlutusIR.Compiler (
     Compiling,
     Error (..),
     AsError (..),
+    AsTypeError (..),
     Provenance (..),
     noProvenance,
     CompilationOpts,
@@ -28,6 +29,7 @@ import qualified Language.PlutusIR.Transform.LetFloat        as LetFloat
 import qualified Language.PlutusIR.Transform.NonStrict       as NonStrict
 import           Language.PlutusIR.Transform.Rename          ()
 import qualified Language.PlutusIR.Transform.ThunkRecursions as ThunkRec
+import qualified Language.PlutusIR.TypeCheck as TC
 
 import qualified Language.PlutusCore                         as PLC
 
@@ -43,13 +45,17 @@ simplifyTerm = runIfOpts (pure . DeadCode.removeDeadBindings)
 floatTerm :: (MonadReader (CompilationCtx a) m, Semigroup b) => Term TyName Name uni b -> m (Term TyName Name uni b)
 floatTerm = runIfOpts (pure . LetFloat.floatTerm)
 
+
 -- | The 1st half of the PIR compiler pipeline up to floating/merging the lets.
 -- We stop momentarily here to give a chance to the tx-plugin
 -- to dump a "readable" version of pir (i.e. floated).
-compileToReadable :: (PLC.MonadQuote m, MonadReader (CompilationCtx a) m, Ord b)
-                  => Term TyName Name uni b -> m (Term TyName Name uni (Provenance b))
-compileToReadable =
+compileToReadable :: (Compiling m e uni b)
+                  => TC.TypeCheckConfig uni
+                  -> Term TyName Name uni b
+                  -> m (Term TyName Name uni (Provenance b))
+compileToReadable tcConfig =
     (pure . original)
+    >=> (\ t -> TC.inferType tcConfig t >> pure t)
     >=> simplifyTerm
     >=> (pure . ThunkRec.thunkRecursions)
     -- We need globally unique names for floating and compiling non-strict bindings away
@@ -70,7 +76,8 @@ compileReadableToPlc =
     >=> Let.compileLets Let.NonRecTerms
     >=> lowerTerm
 
-
 --- | Compile a 'Term' into a PLC Term. Note: the result *does* have globally unique names.
-compileTerm :: Compiling m e uni a => Term TyName Name uni a -> m (PLCTerm uni a)
-compileTerm = compileToReadable >=> compileReadableToPlc
+compileTerm :: Compiling m e uni a
+            => TC.TypeCheckConfig uni
+            -> Term TyName Name uni a -> m (PLCTerm uni a)
+compileTerm tcConfig = compileToReadable tcConfig >=> compileReadableToPlc

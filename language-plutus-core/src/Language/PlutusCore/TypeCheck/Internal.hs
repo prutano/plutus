@@ -15,6 +15,7 @@ module Language.PlutusCore.TypeCheck.Internal
     ( DynamicBuiltinNameTypes (..)
     , TypeCheckConfig (..)
     , TypeCheckM
+    , TypeCheckEnv (..)
     , tccDynamicBuiltinNameTypes
     , runTypeCheckM
     , inferKindM
@@ -23,6 +24,8 @@ module Language.PlutusCore.TypeCheck.Internal
     , typeOfBuiltinName
     , inferTypeM
     , checkTypeM
+    , tceTyVarKinds
+    , tceVarTypes
     ) where
 
 import           Language.PlutusCore.Constant

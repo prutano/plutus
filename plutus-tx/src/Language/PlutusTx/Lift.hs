@@ -22,6 +22,7 @@ import           Language.PlutusTx.Lift.Instances              ()
 
 import           Language.PlutusIR
 import           Language.PlutusIR.Compiler
+import qualified           Language.PlutusIR.Compiler.Error as PIR
 import           Language.PlutusIR.Compiler.Definitions
 import qualified Language.PlutusIR.MkPir                       as PIR
 
@@ -44,26 +45,37 @@ type Throwable uni = (PLC.GShow uni, PLC.Closed uni, uni `PLC.Everywhere` Pretty
 
 -- | Get a Plutus Core term corresponding to the given value.
 safeLift
-    :: (Lift.Lift uni a, AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
+    :: (Lift.Lift uni a
+       , PIR.AsTypeError e uni (Provenance ()), PLC.GShow uni, PLC.GEq uni
+       , PLC.DefaultUni PLC.<: uni
+       , AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
     => a -> m (PLC.Term TyName Name uni ())
 safeLift x = do
     lifted <- liftQuote $ runDefT () $ Lift.lift x
-    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm lifted
+    -- FIXME: we need to pass the real dynamic builtin tcconfig map in compileterm
+    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm PLC.defConfig lifted
     pure $ void compiled
 
 -- | Get a Plutus Core program corresponding to the given value.
 safeLiftProgram
-    :: (Lift.Lift uni a, AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
+    :: (Lift.Lift uni a
+       , PIR.AsTypeError e uni (Provenance ()), PLC.GShow uni, PLC.GEq uni
+       , PLC.DefaultUni PLC.<: uni
+       , AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
     => a -> m (PLC.Program TyName Name uni ())
 safeLiftProgram x = PLC.Program () (PLC.defaultVersion ()) <$> safeLift x
 
 safeLiftCode
-    :: (Lift.Lift uni a, AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
+    :: (Lift.Lift uni a
+       , PIR.AsTypeError e uni (Provenance ()), PLC.GShow uni, PLC.GEq uni       , PLC.DefaultUni PLC.<: uni
+       , AsError e uni (Provenance ()), MonadError e m, MonadQuote m)
     => a -> m (CompiledCode uni a)
 safeLiftCode x = DeserializedCode <$> safeLiftProgram x <*> pure Nothing
 
 safeConstCode
     :: ( Lift.Typeable uni a, AsError e uni (Provenance ()), MonadError e m, MonadQuote m
+       , PIR.AsTypeError e uni (Provenance ()), PLC.GShow uni, PLC.GEq uni
+       , PLC.DefaultUni PLC.<: uni
        , PLC.Closed uni, uni `PLC.Everywhere` Serialise
        )
     => Proxy a
@@ -74,7 +86,8 @@ safeConstCode proxy code = do
         term <- Lift.lift code
         ty <- Lift.typeRep proxy
         pure $ TyInst () (PLC.constPartial term) ty
-    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm newTerm
+    -- FIXME: we need to pass the real dynamic builtin tcconfig map in compileterm
+    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm PLC.defConfig newTerm
     pure $ DeserializedCode (PLC.Program () (PLC.defaultVersion ()) (void compiled)) Nothing
 
 unsafely :: Throwable uni => ExceptT (Error uni (Provenance ())) Quote a -> a
@@ -85,11 +98,11 @@ unsafely ma = runQuote $ do
         Right t -> pure t
 
 -- | Get a Plutus Core term corresponding to the given value, throwing any errors that occur as exceptions and ignoring fresh names.
-lift :: (Lift.Lift uni a, Throwable uni) => a -> PLC.Term TyName Name uni ()
+lift :: (Lift.Lift uni a, Throwable uni       , PLC.DefaultUni PLC.<: uni, PLC.GEq uni) => a -> PLC.Term TyName Name uni ()
 lift a = unsafely $ safeLift a
 
 -- | Get a Plutus Core program corresponding to the given value, throwing any errors that occur as exceptions and ignoring fresh names.
-liftProgram :: (Lift.Lift uni a, Throwable uni) => a -> PLC.Program TyName Name uni ()
+liftProgram :: (Lift.Lift uni a, Throwable uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni) => a -> PLC.Program TyName Name uni ()
 liftProgram x = PLC.Program () (PLC.defaultVersion ()) $ lift x
 
 -- | Get a Plutus Core program in the default universe corresponding to the given value, throwing any errors that occur as exceptions and ignoring fresh names.
@@ -97,12 +110,14 @@ liftProgramDef :: Lift.Lift PLC.DefaultUni a => a -> PLC.Program TyName Name PLC
 liftProgramDef = liftProgram
 
 -- | Get a Plutus Core program corresponding to the given value as a 'CompiledCode', throwing any errors that occur as exceptions and ignoring fresh names.
-liftCode :: (Lift.Lift uni a, Throwable uni) => a -> CompiledCode uni a
+liftCode :: (Lift.Lift uni a, Throwable uni, PLC.GEq uni       , PLC.DefaultUni PLC.<: uni) => a -> CompiledCode uni a
 liftCode x = unsafely $ safeLiftCode x
 
 -- | Creates a program that ignores an argument of the given type and returns the program given.
 constCode
-    :: (Lift.Typeable uni a, Throwable uni, uni `PLC.Everywhere` Serialise)
+    :: (Lift.Typeable uni a, Throwable uni, PLC.GEq uni
+       , PLC.DefaultUni PLC.<: uni
+       , uni `PLC.Everywhere` Serialise)
     => Proxy a
     -> CompiledCode uni b
     -> CompiledCode uni (a -> b)
@@ -124,6 +139,7 @@ iff the original term has the given type. We opt for `(\x : <the type> -> x) ter
 typeCheckAgainst
     :: forall e a uni m .
        ( Lift.Typeable uni a
+       , PIR.AsTypeError e uni (Provenance ())
        , PLC.AsTypeError e uni (Provenance ()), AsError e uni (Provenance ())
        , MonadError e m, MonadQuote m
        , PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni
@@ -140,7 +156,8 @@ typeCheckAgainst p plcTerm = do
         ty <- Lift.typeRep p
         pure $ TyInst () PLC.idFun ty
     let applied = Apply () idFun term
-    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm applied
+    -- FIXME: we need to pass the real dynamic builtin tcconfig map in compileterm
+    compiled <- flip runReaderT defaultCompilationCtx $ compileTerm PLC.defConfig applied
     types <- PLC.getStringBuiltinTypes noProvenance
     void $ PLC.inferType (PLC.defConfig { PLC._tccDynamicBuiltinNameTypes = types }) compiled
 
@@ -148,6 +165,7 @@ typeCheckAgainst p plcTerm = do
 typeCode
     :: forall e a uni m .
        ( Lift.Typeable uni a
+       , PIR.AsTypeError e uni (Provenance ())
        , PLC.AsTypeError e uni (Provenance ()), AsError e uni (Provenance ())
        , MonadError e m, MonadQuote m
        , PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni

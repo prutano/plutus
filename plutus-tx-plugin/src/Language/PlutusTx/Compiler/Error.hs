@@ -74,6 +74,9 @@ instance (PLC.GShow uni, PLC.Closed uni, uni `PLC.Everywhere` PLC.PrettyConst, P
             PP.Pretty (Error uni a) where
     pretty = PLC.prettyPlcClassicDebug
 
+instance uni1 ~ uni2 => PIR.AsTypeError (CompileError uni1) uni2 (PIR.Provenance ()) where
+    _TypeError = _NoContext . _PIRError . PIR._TypeError
+
 instance uni1 ~ uni2 => PLC.AsTypeError (CompileError uni1) uni2 () where
     _TypeError = _NoContext . _PLCError . PLC._TypeError
 

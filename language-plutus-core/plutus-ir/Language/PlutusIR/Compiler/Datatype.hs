@@ -1,8 +1,16 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE LambdaCase  #-}
 -- | Functions for compiling let-bound PIR datatypes into PLC.
-module Language.PlutusIR.Compiler.Datatype (compileDatatype, compileRecDatatypes) where
+module Language.PlutusIR.Compiler.Datatype
+    ( compileDatatype
+    , compileRecDatatypes
+    , resultTypeName
+    , constructorCaseType
+    , funTyArgs
+    , funResultType
+    ) where
 
 import           PlutusPrelude                          (showText)
 
@@ -24,7 +32,7 @@ import qualified Data.Text                              as T
 import           Data.Traversable
 
 import qualified Data.List.NonEmpty                     as NE
-
+import qualified Language.PlutusCore.Normalize.Internal as Norm
 -- Utilities
 
 -- | @replaceFunTyTarget X (A->..->Z) = (A->..->X)@
@@ -38,12 +46,25 @@ replaceFunTyTarget newTarget t = case t of
 constructorCaseType :: Type tyname uni a -> VarDecl tyname name uni a -> Type tyname uni a
 constructorCaseType resultType = replaceFunTyTarget resultType . varDeclType
 
+-- | Get recursively all the domains and codomains of a type.
+-- @funTySections (A->B->C) = [A, B, C]@
+-- @funTySections (X) = [X]@
+funTySections :: Type tyname uni a -> NE.NonEmpty (Type tyname uni a)
+funTySections = \case
+    TyFun _ t1 t2 -> t1 NE.<| funTySections t2
+    t             -> pure t
+
 -- | Get the argument types of a function type.
 -- @funTyArgs (A->B->C) = [A, B]@
-funTyArgs :: Type tyname uni a -> [Type tyname uni a]
-funTyArgs t = case t of
-    TyFun _ t1 t2 -> t1 : funTyArgs t2
-    _             -> []
+funTyArgs :: Type tyname uni a ->  [Type tyname uni a]
+funTyArgs = NE.init . funTySections
+
+-- | Get the result type of a function.
+-- If not a function, then is the same as `id`
+-- @funResultType (A->B->C) = C@
+-- @funResultType (X) = X@
+funResultType :: Type tyname uni a ->  Type tyname uni a
+funResultType = NE.last . funTySections
 
 -- | Given the type of a constructor, get its argument types.
 -- @constructorArgTypes (A->Maybe A) = [A]
@@ -54,7 +75,7 @@ constructorArgTypes = funTyArgs . varDeclType
 unveilDatatype :: Eq tyname => Type tyname uni a -> Datatype tyname name uni a -> Type tyname uni a -> Type tyname uni a
 unveilDatatype dty (Datatype _ tn _ _ _) = typeSubstTyNames (\n -> if n == tyVarDeclName tn then Just dty else Nothing)
 
-resultTypeName :: Compiling m e uni a => Datatype TyName Name uni (Provenance a) -> m TyName
+resultTypeName :: MonadQuote m => Datatype TyName Name uni a -> m TyName
 resultTypeName (Datatype _ tn _ _ _) = liftQuote $ freshTyName $ "out_" <> (nameString $ unTyName $ tyVarDeclName tn)
 
 -- Datatypes
@@ -221,6 +242,7 @@ mkScottTy :: forall m e uni a . Compiling m e uni a => Datatype TyName Name uni 
 mkScottTy d@(Datatype _ _ _ _ constrs) = do
     p <- getEnclosing
     resultType <- resultTypeName d
+     -- FIXME: normalize datacons' types also here
     let caseTys = fmap (constructorCaseType (TyVar p resultType)) constrs
     pure $
         -- forall resultType
@@ -261,6 +283,7 @@ mkConstructorType :: Compiling m e uni a => Datatype TyName Name uni (Provenance
 -- this type appears *inside* the scope of the abstraction for the datatype so we can just reference the name and
 -- we don't need to do anything to the declared type
 -- see note [Abstract data types]
+-- FIXME: normalize constructors also here
 mkConstructorType (Datatype _ _ tvs _ _) constr = withEnclosing (DatatypeComponent ConstructorType) $ PIR.mkIterTyForall <$> pure tvs <*> pure (varDeclType constr)
 
 -- See note [Scott encoding of datatypes]
@@ -281,6 +304,7 @@ mkConstructor dty d@(Datatype _ _ tvs _ constrs) index = withEnclosing (Datatype
     casesAndTypes <- do
           -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
           -- see note [Abstract data types]
+          -- FIXME: normalize datacons' types also here
           let caseTypes = unveilDatatype (getType dty) d <$> fmap (constructorCaseType (TyVar p resultType)) constrs
           caseArgNames <- for constrs (\c -> safeFreshName $ "case_" <> T.pack (varDeclNameString c))
           pure $ zipWith (VarDecl p) caseArgNames caseTypes
@@ -291,8 +315,9 @@ mkConstructor dty d@(Datatype _ _ tvs _ constrs) index = withEnclosing (Datatype
 
     -- constructor args and their types
     argsAndTypes <- do
-          -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
-          -- see note [Abstract data types]
+        -- these types appear *outside* the scope of the abstraction for the datatype, so we need to use the concrete datatype here
+        -- see note [Abstract data types]
+        -- FIXME: normalize datacons' types also here
         let argTypes = unveilDatatype (getType dty) d <$> constructorArgTypes constr
         -- we don't have any names for these things, we just had the type, so we call them "arg_i
         argNames <- for [0..(length argTypes -1)] (\i -> safeFreshName $ "arg_" <> showText i)

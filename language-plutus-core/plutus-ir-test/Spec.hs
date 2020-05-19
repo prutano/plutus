@@ -15,12 +15,14 @@ import           TestLib
 import           OptimizerSpec
 import           ParserSpec
 import           TransformSpec
+import           TypeSpec
 
 import           Language.PlutusCore.Pretty (PrettyConst)
 import           Language.PlutusCore.Quote
 
 import           Language.PlutusIR
 import           Language.PlutusIR.Compiler
+import  Language.PlutusIR.TypeCheck as TC
 import           Language.PlutusIR.Parser   hiding (Error)
 
 import qualified Language.PlutusCore        as PLC
@@ -35,7 +37,6 @@ import           Control.Monad.Morph
 import           Control.Monad.Reader
 
 import           Data.Functor.Identity
-import           Text.Megaparsec.Pos
 
 main :: IO ()
 main = defaultMain $ runTestNestedIn ["plutus-ir-test"] tests
@@ -44,9 +45,6 @@ instance ( PLC.GShow uni, PLC.GEq uni, PLC.DefaultUni PLC.<: uni
          , PLC.Closed uni, uni `PLC.Everywhere` PrettyConst, Typeable uni, Pretty a, Typeable a, Ord a
          ) => GetProgram (Term TyName Name uni a) uni where
     getProgram = asIfThrown . fmap (trivialProgram . void) . compileAndMaybeTypecheck True
-
-instance Pretty SourcePos where
-    pretty = pretty . sourcePosPretty
 
 -- | Adapt an computation that keeps its errors in an 'Except' into one that looks as if it caught them in 'IO'.
 asIfThrown
@@ -61,7 +59,7 @@ compileAndMaybeTypecheck
     -> Term TyName Name uni a
     -> Except (Error uni (Provenance a)) (PLC.Term TyName Name uni (Provenance a))
 compileAndMaybeTypecheck doTypecheck pir = flip runReaderT defaultCompilationCtx $ runQuoteT $ do
-    compiled <- compileTerm pir
+    compiled <- compileTerm TC.defConfig pir
     when doTypecheck $ void $ PLC.inferType PLC.defConfig compiled
     pure compiled
 
@@ -76,6 +74,8 @@ tests = testGroup "plutus-ir" <$> sequence
     , errors
     , optimizer
     , transform
+    , types
+    , typeErrors
     ]
 
 prettyprinting :: TestNested
@@ -96,6 +96,7 @@ datatypes = testNested "datatypes"
     [ goldenPlcFromPir term "maybe"
     , goldenPlcFromPir term "listMatch"
     , goldenEvalPir term "listMatchEval"
+    , goldenPlcFromPir term "bindDataTypeNormalize"
     ]
 
 recursion :: TestNested
@@ -121,4 +122,5 @@ roundTripPirTerm = deserialise . serialise . void
 errors :: TestNested
 errors = testNested "errors"
     [ goldenPlcFromPirCatch term "mutuallyRecursiveTypes"
+    , goldenPlcFromPirCatch term "recursiveTypeBind"
     ]

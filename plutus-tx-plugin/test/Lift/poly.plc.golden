@@ -7,10 +7,10 @@
             Plugin_Data_Spec_MyPolyData_i0
             (fun (type) (fun (type) (type)))
             (lam
-              Plugin_Data_Spec_Poly1_i0
+              Plugin_Data_Spec_PolyA1_i0
               (all a_i0 (type) (all b_i0 (type) (fun a_i2 (fun b_i1 [[Plugin_Data_Spec_MyPolyData_i4 a_i2] b_i1]))))
               (lam
-                Plugin_Data_Spec_Poly2_i0
+                Plugin_Data_Spec_PolyB2_i0
                 (all a_i0 (type) (all b_i0 (type) (fun a_i2 [[Plugin_Data_Spec_MyPolyData_i5 a_i2] b_i1])))
                 (lam
                   match_Plugin_Data_Spec_MyPolyData_i0
@@ -18,7 +18,7 @@
                   [
                     [
                       {
-                        { Plugin_Data_Spec_Poly1_i3 (con integer) }
+                        { Plugin_Data_Spec_PolyA1_i3 (con integer) }
                         (con integer)
                       }
                       (con 1)
@@ -47,12 +47,12 @@
                   out_Plugin_Data_Spec_MyPolyData_i0
                   (type)
                   (lam
-                    case_Plugin_Data_Spec_Poly1_i0
+                    case_Plugin_Data_Spec_PolyA1_i0
                     (fun a_i6 (fun b_i5 out_Plugin_Data_Spec_MyPolyData_i2))
                     (lam
-                      case_Plugin_Data_Spec_Poly2_i0
+                      case_Plugin_Data_Spec_PolyB2_i0
                       (fun a_i7 out_Plugin_Data_Spec_MyPolyData_i3)
-                      [ [ case_Plugin_Data_Spec_Poly1_i2 arg_0_i5 ] arg_1_i4 ]
+                      [ [ case_Plugin_Data_Spec_PolyA1_i2 arg_0_i5 ] arg_1_i4 ]
                     )
                   )
                 )
@@ -74,12 +74,12 @@
               out_Plugin_Data_Spec_MyPolyData_i0
               (type)
               (lam
-                case_Plugin_Data_Spec_Poly1_i0
+                case_Plugin_Data_Spec_PolyA1_i0
                 (fun a_i5 (fun b_i4 out_Plugin_Data_Spec_MyPolyData_i2))
                 (lam
-                  case_Plugin_Data_Spec_Poly2_i0
+                  case_Plugin_Data_Spec_PolyB2_i0
                   (fun a_i6 out_Plugin_Data_Spec_MyPolyData_i3)
-                  [ case_Plugin_Data_Spec_Poly2_i1 arg_0_i4 ]
+                  [ case_Plugin_Data_Spec_PolyB2_i1 arg_0_i4 ]
                 )
               )
             )
