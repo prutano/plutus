@@ -31,7 +31,7 @@ import           Language.Haskell.Interpreter               (CompilationError, I
                                                              SourceCode, Warning)
 import           Language.Marlowe.Pretty                    (pretty)
 import           Language.PureScript.Bridge                 (BridgePart, Language (Haskell), SumType, buildBridge,
-                                                             mkSumType, writePSTypesWith)
+                                                             genericShow, mkSumType, writePSTypesWith)
 import           Language.PureScript.Bridge.CodeGenSwitches (ForeignOptions (ForeignOptions), defaultSwitch, genForeign)
 import           Language.PureScript.Bridge.TypeParameters  (A)
 import           Marlowe.Contracts                          (couponBondGuaranteed, escrow, swap, zeroCouponBond)
@@ -78,10 +78,10 @@ myTypes =
     , mkSumType (Proxy @Warning)
     , mkSumType (Proxy @(InterpreterResult A))
     , mkSumType (Proxy @MSRes.Response)
-    , mkSumType (Proxy @MSRes.Result)
+    , (genericShow <*> mkSumType) (Proxy @MSRes.Result)
     , mkSumType (Proxy @MSReq.Request)
-    , mkSumType (Proxy @WebSocketRequestMessage)
-    , mkSumType (Proxy @WebSocketResponseMessage)
+    , (genericShow <*> mkSumType) (Proxy @WebSocketRequestMessage)
+    , (genericShow <*> mkSumType) (Proxy @WebSocketResponseMessage)
     ]
 
 mySettings :: Settings

@@ -10,6 +10,7 @@ import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Lens (Lens', to, view)
+import WebSocket (WebSocketRequestMessage)
 import Data.Lens.NonEmptyList (_Head)
 import Data.Lens.Record (prop)
 import Data.List.NonEmpty as NEL
@@ -191,13 +192,13 @@ data Query a
   = SetEditorText String a
   | ResizeEditor a
   | ResetContract a
-  | WebsocketResponse (RemoteData String Result) a
+  | WebSocketResponse (RemoteData String Result) a
   | HasStarted (Boolean -> a)
   | GetCurrentContract (String -> a)
 
 data Message
   = BlocklyCodeSet String
-  | WebsocketMessage String
+  | WebSocketMessage WebSocketRequestMessage
 
 type ChildSlots
   = ( editorSlot :: H.Slot Monaco.Query Monaco.Message Unit

@@ -7,6 +7,7 @@ module Plutus.SCB.Webserver.Types where
 
 import           Data.Aeson             (FromJSON, ToJSON)
 import           Data.Map               (Map)
+import           Data.Text              (Text)
 import           GHC.Generics           (Generic)
 import           Ledger                 (PubKeyHash, Tx, TxId)
 import           Ledger.Index           (UtxoIndex)
@@ -48,5 +49,19 @@ data ContractSignatureResponse t =
         { csrDefinition :: t
         , csrSchemas    :: [FunctionSchema FormSchema]
         }
+    deriving (Show, Eq, Generic)
+    deriving anyclass (FromJSON, ToJSON)
+
+newtype StreamToServer t =
+    Ping Text
+    deriving (Show, Eq, Generic)
+    deriving newtype (FromJSON, ToJSON)
+
+data StreamToClient t
+    = NewChainReport (ChainReport t)
+    | NewContractReport (ContractReport t)
+    | NewChainEvents [ChainEvent t]
+    | Echo Text
+    | ErrorResponse Text
     deriving (Show, Eq, Generic)
     deriving anyclass (FromJSON, ToJSON)

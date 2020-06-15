@@ -3,7 +3,9 @@ module Types where
 import API (RunResult)
 import Analytics (class IsEvent, defaultEvent)
 import Blockly.Types (BlocklyState)
+import Data.Either (Either)
 import Data.Generic.Rep (class Generic)
+import Foreign (MultipleErrors)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Json.JsonEither (JsonEither)
 import Data.Lens (Lens', (^.))
@@ -25,13 +27,15 @@ import Prelude (class Eq, class Show, Unit, eq, show, (<<<), ($))
 import Servant.PureScript.Ajax (AjaxError)
 import Simulation.Types as Simulation
 import Wallet as Wallet
+import WebSocket.Support as WS
+import WebSocket (WebSocketResponseMessage, WebSocketRequestMessage)
 
 ------------------------------------------------------------
 data HQuery a
-  = ReceiveWebsocketMessage String a
+  = ReceiveWebSocketMessage (WS.Output WebSocketResponseMessage) a
 
 data Message
-  = WebsocketMessage String
+  = WebSocketMessage WebSocketRequestMessage
 
 data HAction
   -- Haskell Editor

@@ -26,12 +26,10 @@ module Plutus.SCB.Core
     , refreshProjection
     , runCommand
     , runGlobalQuery
-    , addProcessBus
     , Source(..)
     , toUUID
     -- * Effects
     , ContractEffects
-    , SCBEffects
     -- * Contract messages
     , processAllContractInboxes
     , processContractInbox
@@ -39,11 +37,10 @@ module Plutus.SCB.Core
     , callContractEndpoint
     ) where
 
-import           Cardano.Node.RandomTx            (GenRandomTx)
 import           Control.Monad                    (void)
 import           Control.Monad.Freer              (Eff, Member)
-import           Control.Monad.Freer.Error
-import           Control.Monad.Freer.Extra.Log
+import           Control.Monad.Freer.Error        (Error)
+import           Control.Monad.Freer.Extra.Log    (Log, logInfo)
 import           Control.Monad.IO.Unlift          (MonadUnliftIO)
 import           Control.Monad.Logger             (MonadLogger)
 import qualified Control.Monad.Logger             as MonadLogger
@@ -56,20 +53,17 @@ import qualified Ledger
 import           Plutus.SCB.Command               (installCommand)
 import           Plutus.SCB.Events                (ChainEvent, ContractInstanceId, ContractInstanceState)
 import qualified Plutus.SCB.Query                 as Query
-import           Plutus.SCB.Types                 (ContractExe, DbConfig (DbConfig), SCBError, Source (..),
-                                                   dbConfigFile, dbConfigPoolSize, toUUID)
+import           Plutus.SCB.Types                 (DbConfig (DbConfig), SCBError, Source (..), dbConfigFile,
+                                                   dbConfigPoolSize, toUUID)
 import           Plutus.SCB.Utils                 (render, tshow)
 
-import           Cardano.Node.Follower            (NodeFollowerEffect)
 import           Plutus.SCB.Core.ContractInstance (activateContract, callContractEndpoint, processAllContractInboxes,
                                                    processAllContractOutboxes, processContractInbox)
 import           Plutus.SCB.Effects.Contract      (ContractCommand (..), ContractEffect, invokeContract)
-import           Plutus.SCB.Effects.EventLog      (Connection (..), EventLogEffect, addProcessBus, refreshProjection,
-                                                   runCommand, runGlobalQuery)
+import           Plutus.SCB.Effects.EventLog      (Connection (..), EventLogEffect, refreshProjection, runCommand,
+                                                   runGlobalQuery)
 import qualified Plutus.SCB.Effects.EventLog      as EventLog
 import           Plutus.SCB.Effects.UUID          (UUIDEffect)
-import           Wallet.API                       (WalletEffect)
-import           Wallet.Effects                   (ChainIndexEffect, NodeClientEffect, SigningProcessEffect)
 
 type ContractEffects t =
         '[ EventLogEffect (ChainEvent t)
@@ -136,16 +130,3 @@ dbConnect DbConfig {dbConfigFile, dbConfigPoolSize} = do
     MonadLogger.logDebugN "Connecting to DB"
     connectionPool <- createSqlitePoolFromInfo connectionInfo dbConfigPoolSize
     pure $ EventLog.Connection (defaultSqlEventStoreConfig, connectionPool)
-
-type SCBEffects =
-        '[ GenRandomTx
-        , NodeFollowerEffect
-        , WalletEffect
-        , UUIDEffect
-        , ContractEffect ContractExe
-        , ChainIndexEffect
-        , NodeClientEffect
-        , SigningProcessEffect
-        , EventLogEffect (ChainEvent ContractExe)
-        , Log
-        ]

@@ -8,6 +8,7 @@ import Data.Either (Either(..))
 import Data.Json.JsonEither (JsonEither(..))
 import Data.Lens (assign, to, use, view, (^.))
 import Data.Map as Map
+import WebSocket.Support as WS
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.String as String
@@ -86,18 +87,14 @@ handleQuery ::
   forall m a.
   HQuery a ->
   HalogenM FrontendState HAction ChildSlots Message m (Maybe a)
-handleQuery (ReceiveWebsocketMessage msg next) = do
-  let
-    msgDecoded =
-      unwrap <<< runExceptT
-        $ do
-            f <- parseJSON msg
-            decode f
-  void
-    $ case msgDecoded of
-        Left err -> query _simulationSlot unit (ST.WebsocketResponse (Failure (show msg)) unit)
-        Right (OtherError err) -> query _simulationSlot unit ((ST.WebsocketResponse $ Failure err) unit)
-        Right (CheckForWarningsResult result) -> query _simulationSlot unit ((ST.WebsocketResponse $ Success result) unit)
+handleQuery (ReceiveWebSocketMessage msg next) = do
+  void $ query _simulationSlot unit
+    $ flip ST.WebSocketResponse unit
+    $ case msg of
+        WS.WebSocketClosed -> Failure "Connection lost."
+        WS.ReceiveMessage (Left err) -> Failure (show msg)
+        WS.ReceiveMessage (Right (OtherError err)) -> Failure err
+        WS.ReceiveMessage (Right (CheckForWarningsResult result)) -> Success result
   pure $ Just next
 
 handleAction ::
@@ -111,7 +108,7 @@ handleAction _ (HandleSimulationMessage (ST.BlocklyCodeSet source)) = do
   assign _view BlocklyEditor
   void $ query _blocklySlot unit (Blockly.Resize unit)
 
-handleAction _ (HandleSimulationMessage (ST.WebsocketMessage msg)) = H.raise (WebsocketMessage msg)
+handleAction _ (HandleSimulationMessage (ST.WebSocketMessage msg)) = H.raise (WebSocketMessage msg)
 
 handleAction _ (HandleWalletMessage Wallet.SendContractToWallet) = do
   mContract <- query _simulationSlot unit (request ST.GetCurrentContract)

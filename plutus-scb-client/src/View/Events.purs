@@ -1,4 +1,7 @@
-module View.Events (eventsPane, utxoIndexPane) where
+module View.Events
+  ( eventsPane
+  , utxoIndexPane
+  ) where
 
 import Prelude
 import Bootstrap (alertDanger_, badgePrimary_, cardBody_, cardHeader_, card_, nbsp)
@@ -53,7 +56,7 @@ eventsPane events =
     , cardBody_ [ div_ (countedEventPane <$> countConsecutive events) ]
     ]
 
-countedEventPane :: forall p i. Int /\ ChainEvent ContractExe -> HTML p i
+countedEventPane :: forall t p i. Render t => Int /\ ChainEvent t -> HTML p i
 countedEventPane (count /\ event) =
   div_
     [ preWrap_

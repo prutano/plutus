@@ -30,6 +30,7 @@ import           Control.Monad.Freer
 import           Control.Monad.Freer.Error     (Error, handleError, runError, throwError)
 import           Control.Monad.Freer.Extra.Log (Log, logDebug, logInfo, runStderrLog, writeToLog)
 import           Control.Monad.Freer.Reader    (Reader, asks, runReader)
+import           Control.Monad.Freer.WebSocket (WebSocketEffect, handleWebSocket)
 import           Control.Monad.Freer.Writer    (Writer)
 import           Control.Monad.IO.Class        (MonadIO, liftIO)
 import           Control.Monad.IO.Unlift       (MonadUnliftIO)
@@ -86,84 +87,99 @@ type AppBackend m =
          , ChainIndexEffect
          , Error ClientError
          , EventLogEffect (ChainEvent ContractExe)
+         , WebSocketEffect
          , Error SCBError
          , Writer [Wallet.Emulator.Wallet.WalletEvent]
          , Log
          , Reader Connection
+         , Reader Config
          , Reader Env
          , m
          ]
 
 runAppBackend ::
-    forall m a.
-    ( MonadIO m
-    , MonadLogger m
-    , MonadUnliftIO m
-    )
-    => Env
+       forall m a. (MonadIO m, MonadLogger m, MonadUnliftIO m)
+    => Config
     -> Eff (AppBackend m) a
     -> m (Either SCBError a)
-runAppBackend e@Env{dbConnection, nodeClientEnv, walletClientEnv, signingProcessEnv, chainIndexEnv} =
-    runM
-    . runReader e
-    . runReader dbConnection
-    . runStderrLog
-    . writeToLog
-    . runError
-    . handleEventLogSql
-    . handleChainIndex
-    . handleContractEffectApp
-    . handleUUIDEffect
-    . handleSigningProcess
-    . handleNodeClient
-    . handleWallet
-    . handleNodeFollower
-    . handleRandomTxClient nodeClientEnv
-    where
-        handleChainIndex :: Eff (ChainIndexEffect ': Error ClientError ': _) a -> Eff _ a
+runAppBackend config eff = do
+    env@Env { dbConnection
+            , nodeClientEnv
+            , walletClientEnv
+            , signingProcessEnv
+            , chainIndexEnv
+            } <- mkEnv config
+    let handleChainIndex ::
+               Eff (ChainIndexEffect ': Error ClientError ': _) a -> Eff _ a
         handleChainIndex =
-            flip handleError (throwError . ChainIndexError)
-            . handleChainIndexClient chainIndexEnv
-
-        handleSigningProcess :: Eff (SigningProcessEffect ': Error ClientError ': _) a -> Eff _ a
+            flip handleError (throwError . ChainIndexError) .
+            handleChainIndexClient chainIndexEnv
+        handleSigningProcess ::
+               Eff (SigningProcessEffect ': Error ClientError ': _) a -> Eff _ a
         handleSigningProcess =
-            flip handleError (throwError . SigningProcessError)
-            . SigningProcessClient.handleSigningProcessClient signingProcessEnv
-
-        handleNodeClient :: Eff (NodeClientEffect ': Error ClientError ': _) a -> Eff _ a
+            flip handleError (throwError . SigningProcessError) .
+            SigningProcessClient.handleSigningProcessClient signingProcessEnv
+        handleNodeClient ::
+               Eff (NodeClientEffect ': Error ClientError ': _) a -> Eff _ a
         handleNodeClient =
-            flip handleError (throwError . NodeClientError)
-            . handleNodeClientClient nodeClientEnv
-
-        handleNodeFollower :: Eff (NodeFollowerEffect ': Error ClientError ': _) a -> Eff _ a
+            flip handleError (throwError . NodeClientError) .
+            handleNodeClientClient nodeClientEnv
+        handleNodeFollower ::
+               Eff (NodeFollowerEffect ': Error ClientError ': _) a -> Eff _ a
         handleNodeFollower =
-            flip handleError (throwError . NodeClientError)
-            . handleNodeFollowerClient nodeClientEnv
-
-        handleWallet :: Eff (WalletEffect ': Error WalletAPIError ': Error ClientError ': _) a -> Eff _ a
+            flip handleError (throwError . NodeClientError) .
+            handleNodeFollowerClient nodeClientEnv
+        handleWallet ::
+               Eff (WalletEffect ': Error WalletAPIError ': Error ClientError ': _) a
+            -> Eff _ a
         handleWallet =
-            flip handleError (throwError . WalletClientError)
-            . flip handleError (throwError . WalletError)
-            . WalletClient.handleWalletClient walletClientEnv
+            flip handleError (throwError . WalletClientError) .
+            flip handleError (throwError . WalletError) .
+            WalletClient.handleWalletClient walletClientEnv
+    runM .
+        runReader env .
+        runReader config .
+        runReader dbConnection .
+        runStderrLog .
+        writeToLog .
+        runError .
+        handleWebSocket .
+        handleEventLogSql .
+        handleChainIndex .
+        handleContractEffectApp .
+        handleUUIDEffect .
+        handleSigningProcess .
+        handleNodeClient .
+        handleWallet . handleNodeFollower . handleRandomTxClient nodeClientEnv $
+        eff
 
 
 type App a = Eff (AppBackend (LoggingT IO)) a
 
-runApp :: LogLevel -> Config -> App a -> IO (Either SCBError a)
-runApp minLogLevel Config {dbConfig, nodeServerConfig, walletServerConfig, signingProcessConfig, chainIndexConfig} action =
-    runStdoutLoggingT $ filterLogger (\_ logLevel -> logLevel >= minLogLevel) $ do
-        walletClientEnv <- mkEnv (WalletServer.baseUrl walletServerConfig)
-        nodeClientEnv <- mkEnv (NodeServer.mscBaseUrl nodeServerConfig)
-        signingProcessEnv <- mkEnv (SigningProcess.spBaseUrl signingProcessConfig)
-        chainIndexEnv <- mkEnv (ChainIndex.ciBaseUrl chainIndexConfig)
-        dbConnection <- dbConnect dbConfig
-        let env = Env {..}
-        runAppBackend @(LoggingT IO) env action
+mkEnv :: (MonadUnliftIO m, MonadLogger m) => Config -> m Env
+mkEnv Config { dbConfig
+             , nodeServerConfig
+             , walletServerConfig
+             , signingProcessConfig
+             , chainIndexConfig
+             } = do
+    walletClientEnv <- clientEnv (WalletServer.baseUrl walletServerConfig)
+    nodeClientEnv <- clientEnv (NodeServer.mscBaseUrl nodeServerConfig)
+    signingProcessEnv <-
+        clientEnv (SigningProcess.spBaseUrl signingProcessConfig)
+    chainIndexEnv <- clientEnv (ChainIndex.ciBaseUrl chainIndexConfig)
+    dbConnection <- dbConnect dbConfig
+    pure Env {..}
   where
-    mkEnv baseUrl =
-            mkClientEnv
-                <$> liftIO (newManager defaultManagerSettings)
-                <*> pure baseUrl
+    clientEnv baseUrl =
+        mkClientEnv <$> liftIO (newManager defaultManagerSettings) <*>
+        pure baseUrl
+
+runApp :: LogLevel -> Config -> App a -> IO (Either SCBError a)
+runApp minLogLevel config action =
+    runStdoutLoggingT $
+    filterLogger (\_ logLevel -> logLevel >= minLogLevel) $
+    runAppBackend @(LoggingT IO) config action
 
 handleContractEffectApp ::
        (Member Log effs, Member (Error SCBError) effs, LastMember m effs, MonadIO m)
