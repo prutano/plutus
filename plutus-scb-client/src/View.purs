@@ -14,7 +14,7 @@ import NavTabs (mainTabBar, viewContainer)
 import Plutus.SCB.Events (ChainEvent)
 import Plutus.SCB.Events.Contract (ContractInstanceId, ContractInstanceState)
 import Plutus.SCB.Types (ContractExe)
-import Plutus.SCB.Webserver.Types (ChainReport, ContractReport)
+import Plutus.SCB.Webserver.Types (ChainReport, ContractReport, ContractSignatureResponse(..))
 import Prelude (($), (<$>), (<*>), (<<<))
 import Types (EndpointForm, HAction(..), State(..), View(..), WebData, _crAvailableContracts, _csrDefinition, _utxoIndex)
 import View.Blockchain (annotatedBlockchainPane)
@@ -26,7 +26,7 @@ render ::
   forall m slots.
   MonadAff m =>
   State -> ComponentHTML HAction slots m
-render (State { currentView, chainState, contractReport, chainReport, events, contractSignatures, webSocketMessage }) =
+render (State { currentView, chainState, contractSignatures, chainReport, events, contractStates, webSocketMessage }) =
   div
     [ class_ $ ClassName "main-frame" ]
     [ container_
@@ -35,9 +35,9 @@ render (State { currentView, chainState, contractReport, chainReport, events, co
         , div_
             $ webDataPane
                 ( uncurry3
-                    (mainPane currentView contractSignatures chainState)
+                    (mainPane currentView contractStates chainState)
                 )
-                (tuple3 <$> contractReport <*> chainReport <*> events)
+                (tuple3 <$> contractSignatures <*> chainReport <*> events)
         ]
     ]
 
@@ -70,13 +70,13 @@ mainPane ::
   View ->
   Map ContractInstanceId (WebData (ContractInstanceState t /\ Array EndpointForm)) ->
   Chain.State ->
-  ContractReport ContractExe ->
+  Array (ContractSignatureResponse ContractExe) ->
   ChainReport t ->
   Array (ChainEvent ContractExe) ->
   HTML p HAction
-mainPane currentView contractSignatures chainState contractReport chainReport events =
+mainPane currentView contractStates chainState contractSignatures chainReport events =
   row_
-    [ activeContractPane currentView contractSignatures contractReport
+    [ activeContractPane currentView contractStates contractSignatures
     , blockchainPane currentView chainState chainReport
     , eventLogPane currentView events chainReport
     ]
@@ -92,19 +92,18 @@ activeContractPane ::
             )
         )
     ) ->
-  ContractReport ContractExe -> HTML p HAction
-activeContractPane currentView contractSignatures contractReport =
+  Array (ContractSignatureResponse ContractExe) -> HTML p HAction
+activeContractPane currentView contractStates contractSignatures =
   viewContainer currentView ActiveContracts
     [ row_
-        [ col12_ [ contractStatusesPane contractSignatures ]
+        [ col12_ [ contractStatusesPane contractStates ]
         , col12_
             [ installedContractsPane
                 ( toArrayOf
-                    ( _crAvailableContracts
-                        <<< traversed
+                    ( traversed
                         <<< _csrDefinition
                     )
-                    contractReport
+                    contractSignatures
                 )
             ]
         ]

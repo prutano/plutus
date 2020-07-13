@@ -14,9 +14,9 @@ import Clipboard (class MonadClipboard)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State.Extra (zoomStateT)
-import Data.Array (filter)
+import Data.Array (filter, find)
 import Data.Either (Either(..))
-import Data.Lens (_1, _2, assign, findOf, modifying, to, traversed, use, view)
+import Data.Lens (_1, _2, assign, modifying, to, use, view)
 import Data.Lens.At (at)
 import Data.Lens.Extra (peruse, toSetOf)
 import Data.Lens.Index (ix)
@@ -36,7 +36,7 @@ import Language.Plutus.Contract.Effects.ExposeEndpoint (EndpointDescription)
 import Ledger.Ada (Ada(..))
 import Ledger.Extra (adaToValue)
 import Ledger.Value (Value)
-import MonadApp (class MonadApp, activateContract, getFullReport, invokeEndpoint, log, runHalogenApp, sendWebSocketMessage)
+import MonadApp (class MonadApp, activateContract, getFullReport, invokeEndpoint, log, runHalogenApp)
 import Network.RemoteData (RemoteData(..), _Success)
 import Network.RemoteData as RemoteData
 import Playground.Lenses (_endpointDescription, _schema)
@@ -44,13 +44,13 @@ import Playground.Types (FunctionSchema(..), _FunctionSchema)
 import Plutus.SCB.Events.Contract (ContractInstanceState(..))
 import Plutus.SCB.Types (ContractExe)
 import Plutus.SCB.Webserver (SPParams_(..))
-import Plutus.SCB.Webserver.Types (ContractReport, ContractSignatureResponse(..), StreamToClient(..), StreamToServer(..))
+import Plutus.SCB.Webserver.Types (ContractSignatureResponse(..), StreamToClient(..))
 import Prim.TypeError (class Warn, Text)
 import Schema (FormSchema)
 import Schema.Types (formArgumentToJson, toArgument)
 import Schema.Types as Schema
 import Servant.PureScript.Settings (SPSettings_, defaultSettings)
-import Types (EndpointForm, HAction(..), Output, Query(..), State(..), View(..), WebData, _annotatedBlockchain, _chainReport, _chainState, _contractActiveEndpoints, _contractReport, _contractSignatures, _contractStates, _crAvailableContracts, _csContract, _csCurrentState, _currentView, _events, _webSocketMessage)
+import Types (EndpointForm, HAction(..), Output, Query(..), State(..), View(..), WebData, _annotatedBlockchain, _chainReport, _chainState, _contractActiveEndpoints, _contractReport, _contractSignatures, _contractStates, _crActiveContractStates, _crAvailableContracts, _csContract, _csCurrentState, _currentView, _events, _webSocketMessage)
 import Validation (_argument)
 import View as View
 import WebSocket.Support as WS
@@ -62,11 +62,11 @@ initialState :: State
 initialState =
   State
     { currentView: ActiveContracts
-    , contractReport: NotAsked
+    , contractSignatures: NotAsked
     , chainReport: NotAsked
     , events: NotAsked
     , chainState: Chain.initialState
-    , contractSignatures: Map.empty
+    , contractStates: Map.empty
     , webSocketMessage: NotAsked
     }
 
@@ -105,11 +105,10 @@ handleQuery (ReceiveWebSocketMessage (WS.ReceiveMessage msg) next) = do
   case msg of
     Right (NewChainReport report) -> assign (_chainReport <<< _Success) report
     Right (NewContractReport report) -> do
-      assign (_contractReport <<< _Success) report
+      assign (_contractSignatures <<< _Success) (view _crAvailableContracts report)
       traverse_ updateFormsForContractInstance
-        (view _contractStates report)
+        (view _crActiveContractStates report)
     Right (NewChainEvents events) -> assign (_events <<< _Success) events
-    Right (Echo _) -> pure unit
     Right (ErrorResponse _) -> pure unit
     Left err -> pure unit
   assign _webSocketMessage $ RemoteData.fromEither msg
@@ -128,9 +127,7 @@ handleAction ::
   HAction -> m Unit
 handleAction Init = handleAction LoadFullReport
 
-handleAction (ChangeView view) = do
-  sendWebSocketMessage $ Ping $ show view
-  assign _currentView view
+handleAction (ChangeView view) = assign _currentView view
 
 handleAction (ActivateContract contract) = activateContract contract
 
@@ -141,11 +138,11 @@ handleAction LoadFullReport = do
   for_ fullReportResult
     ( \report ->
         traverse_ updateFormsForContractInstance
-          (view (_contractReport <<< _contractStates) report)
+          (view (_contractReport <<< _crActiveContractStates) report)
     )
   where
   assignFullReportData v = do
-    assign _contractReport (view _contractReport <$> v)
+    assign _contractSignatures (view (_contractReport <<< _crAvailableContracts) <$> v)
     assign _chainReport (view _chainReport <$> v)
     assign _events (view _events <$> v)
 
@@ -165,7 +162,7 @@ handleAction (ChainAction subaction) = do
 
 handleAction (ChangeContractEndpointCall contractInstanceId endpointIndex subaction) = do
   modifying
-    ( _contractSignatures
+    ( _contractStates
         <<< ix contractInstanceId
         <<< _Success
         <<< _2
@@ -183,7 +180,7 @@ handleAction (InvokeContractEndpoint contractInstanceId endpointForm) = do
     encodedForm = RawJson <<< encodeJSON <$> formArgumentToJson (view _argument endpointForm)
   for_ encodedForm
     $ \argument -> do
-        assign (_contractSignatures <<< at contractInstanceId) (Just Loading)
+        assign (_contractStates <<< at contractInstanceId) (Just Loading)
         invokeEndpoint argument contractInstanceId endpointDescription
 
 updateFormsForContractInstance ::
@@ -195,28 +192,28 @@ updateFormsForContractInstance newContractInstance = do
     csContractId = view _csContract newContractInstance
   oldContractInstance :: Maybe (ContractInstanceState ContractExe) <-
     peruse
-      ( _contractSignatures
+      ( _contractStates
           <<< ix csContractId
           <<< _Success
           <<< _1
       )
   when (oldContractInstance /= Just newContractInstance)
     $ do
-        contractReport :: WebData (ContractReport ContractExe) <- use _contractReport
+        contractSignatures <- use _contractSignatures
         let
           newForms :: Maybe (WebData (Array EndpointForm))
-          newForms = sequence $ createNewEndpointForms <$> contractReport <*> pure newContractInstance
-        assign (_contractSignatures <<< at csContractId)
+          newForms = sequence $ createNewEndpointForms <$> contractSignatures <*> pure newContractInstance
+        assign (_contractStates <<< at csContractId)
           (map (Tuple newContractInstance) <$> newForms)
 
 createNewEndpointForms ::
-  ContractReport ContractExe ->
+  Array (ContractSignatureResponse ContractExe) ->
   ContractInstanceState ContractExe ->
   Maybe (Array EndpointForm)
-createNewEndpointForms contractReport instanceState =
+createNewEndpointForms contractSignatures instanceState =
   let
     matchingSignature :: Maybe (ContractSignatureResponse ContractExe)
-    matchingSignature = getMatchingSignature instanceState contractReport
+    matchingSignature = getMatchingSignature instanceState contractSignatures
   in
     createEndpointForms instanceState <$> matchingSignature
 
@@ -251,13 +248,8 @@ getMatchingSignature ::
   forall t.
   Eq t =>
   ContractInstanceState t ->
-  ContractReport t ->
+  Array (ContractSignatureResponse t) ->
   Maybe (ContractSignatureResponse t)
-getMatchingSignature (ContractInstanceState { csContractDefinition }) =
-  findOf
-    ( _crAvailableContracts
-        <<< traversed
-    )
-    isMatch
+getMatchingSignature (ContractInstanceState { csContractDefinition }) = find isMatch
   where
   isMatch (ContractSignatureResponse { csrDefinition }) = csrDefinition == csContractDefinition

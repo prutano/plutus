@@ -31,7 +31,7 @@ class
   getFullReport :: m (WebData (FullReport ContractExe))
   invokeEndpoint :: RawJson -> ContractInstanceId -> EndpointDescription -> m (WebData (ContractInstanceState ContractExe))
   activateContract :: ContractExe -> m Unit
-  sendWebSocketMessage :: StreamToServer ContractExe -> m Unit
+  sendWebSocketMessage :: StreamToServer -> m Unit
   log :: String -> m Unit
 
 newtype HalogenApp m a
