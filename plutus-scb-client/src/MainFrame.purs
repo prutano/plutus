@@ -16,7 +16,7 @@ import Control.Monad.State (class MonadState)
 import Control.Monad.State.Extra (zoomStateT)
 import Data.Array (filter)
 import Data.Either (Either(..))
-import Data.Lens (_1, _2, assign, findOf, modifying, to, traversed, view)
+import Data.Lens (_1, _2, assign, findOf, modifying, to, traversed, use, view)
 import Data.Lens.At (at)
 import Data.Lens.Extra (peruse, toSetOf)
 import Data.Lens.Index (ix)
@@ -25,7 +25,7 @@ import Data.Maybe (Maybe(..))
 import Data.RawJson (RawJson(..))
 import Data.Set (Set)
 import Data.Set as Set
-import Data.Traversable (for_, traverse_)
+import Data.Traversable (for_, sequence, traverse_)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
@@ -44,7 +44,7 @@ import Playground.Lenses (_endpointDescription, _getEndpointDescription, _schema
 import Playground.Types (FunctionSchema(..), _FunctionSchema)
 import Plutus.SCB.Events.Contract (ContractInstanceState(..))
 import Plutus.SCB.Types (ContractExe)
-import Plutus.SCB.Webserver (SPParams_(..), getApiContractByContractinstanceidSchema, getApiFullreport, postApiContractActivate, postApiContractByContractinstanceidEndpointByEndpointname)
+import Plutus.SCB.Webserver (SPParams_(..), getApiFullreport, postApiContractActivate, postApiContractByContractinstanceidEndpointByEndpointname)
 import Plutus.SCB.Webserver.Types (ContractReport, ContractSignatureResponse(..), StreamToClient(..), StreamToServer(..))
 import Prim.TypeError (class Warn, Text)
 import Schema (FormSchema)
@@ -198,7 +198,6 @@ handleAction (InvokeContractEndpoint contractInstanceId endpointForm) = do
 
 updateFormsForContractInstance ::
   forall m.
-  Warn (Text "TODO We shouldn't have to go to the backend every time for this data. Contract schemas don't change during the lifetime of the contract.") =>
   MonadAsk (SPSettings_ SPParams_) m =>
   MonadAff m =>
   MonadState State m =>
@@ -215,28 +214,23 @@ updateFormsForContractInstance newContractInstance = do
       )
   when (oldContractInstance /= Just newContractInstance)
     $ do
+        contractReport :: WebData (ContractReport ContractExe) <- use _contractReport
         let
-          uuid = view (_csContract <<< _contractInstanceIdString) newContractInstance
-        contractSchema <- runAjax $ getApiContractByContractinstanceidSchema uuid
+          newForms :: Maybe (WebData (Array EndpointForm))
+          newForms = sequence $ createNewEndpointForms <$> contractReport <*> pure newContractInstance
         assign (_contractSignatures <<< at csContractId)
-          (Just (Tuple newContractInstance <$> (createEndpointForms newContractInstance <$> contractSchema)))
+          (map (Tuple newContractInstance) <$> newForms)
 
-createNewEndpointFormsM ::
-  forall m.
-  Monad m =>
-  m (ContractReport ContractExe) ->
-  m (ContractInstanceState ContractExe) ->
-  m (Maybe (Array EndpointForm))
-createNewEndpointFormsM mContractReport mInstanceState = do
-  contractReport <- mContractReport
-  instanceState <- mInstanceState
+createNewEndpointForms ::
+  ContractReport ContractExe ->
+  ContractInstanceState ContractExe ->
+  Maybe (Array EndpointForm)
+createNewEndpointForms contractReport instanceState =
   let
     matchingSignature :: Maybe (ContractSignatureResponse ContractExe)
     matchingSignature = getMatchingSignature instanceState contractReport
-
-    newForms :: Maybe (Array EndpointForm)
-    newForms = createEndpointForms instanceState <$> matchingSignature
-  pure newForms
+  in
+    createEndpointForms instanceState <$> matchingSignature
 
 createEndpointForms ::
   forall t.
