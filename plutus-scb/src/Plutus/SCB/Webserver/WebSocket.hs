@@ -20,6 +20,7 @@ import           Control.Monad.Freer.Reader    (Reader, ask)
 import           Control.Monad.Freer.WebSocket (WebSocketEffect, acceptConnection, sendJSON)
 import           Control.Monad.IO.Class        (MonadIO, liftIO)
 import           Control.Monad.Logger          (LogLevel (LevelDebug))
+import           Data.Aeson                    (ToJSON)
 import           Data.Time.Units               (Second, TimeUnit)
 import           Network.WebSockets.Connection (Connection, PendingConnection, withPingThread)
 import           Plutus.SCB.App                (runApp)
@@ -28,15 +29,9 @@ import           Plutus.SCB.Effects.EventLog   (EventLogEffect)
 import           Plutus.SCB.Events             (ChainEvent)
 import           Plutus.SCB.Types              (Config, ContractExe, SCBError)
 import           Plutus.SCB.Utils              (tshow)
-import           Plutus.SCB.Webserver.Handler  (getChainReport, getContractReport)
-import           Plutus.SCB.Webserver.Types    (StreamToClient (NewChainReport, NewContractReport))
+import           Plutus.SCB.Webserver.Handler  (getChainReport, getContractReport, getEvents)
+import           Plutus.SCB.Webserver.Types    (StreamToClient (NewChainEvents, NewChainReport, NewContractReport))
 import           Wallet.Effects                (ChainIndexEffect)
-
-timeBetweenChainReports :: Second
-timeBetweenChainReports = 10
-
-timeBetweenEvents :: Second
-timeBetweenEvents = 3
 
 ------------------------------------------------------------
 -- Message processors.
@@ -48,11 +43,7 @@ chainReportThread ::
        )
     => Connection
     -> Eff effs ()
-chainReportThread connection =
-    pollAndNotifyOnChange timeBetweenChainReports getChainReport notify
-  where
-    notify newReport =
-        sendJSON connection $ NewChainReport newReport
+chainReportThread = watchAndNotify (5 :: Second) getChainReport NewChainReport
 
 contractStateThread ::
        ( Member WebSocketEffect effs
@@ -62,11 +53,33 @@ contractStateThread ::
        )
     => Connection
     -> Eff effs ()
-contractStateThread connection =
-    pollAndNotifyOnChange timeBetweenEvents getContractReport notify
-  where
-    notify newReport =
-        sendJSON connection $ NewContractReport newReport
+contractStateThread =
+    watchAndNotify (3 :: Second) getContractReport NewContractReport
+
+eventsThread ::
+       ( Member WebSocketEffect effs
+       , Member (EventLogEffect (ChainEvent ContractExe)) effs
+       , Member DelayEffect effs
+       )
+    => Connection
+    -> Eff effs ()
+eventsThread =
+    watchAndNotify (15 :: Second) getEvents NewChainEvents
+
+watchAndNotify ::
+       ( TimeUnit t
+       , Member DelayEffect effs
+       , Member WebSocketEffect effs
+       , Eq a
+       , ToJSON b
+       )
+    => t
+    -> Eff effs a
+    -> (a -> b)
+    -> Connection
+    -> Eff effs ()
+watchAndNotify time query wrapper connection =
+    watchForChanges time query (sendJSON connection . wrapper)
 
 -- TODO Polling is icky. But we can't use Eventful's hook system
 -- because that relies all events coming in from the same thread. We
@@ -75,13 +88,13 @@ contractStateThread connection =
 --
 -- Can we use the DB commit hook instead?
 -- https://www.sqlite.org/c3ref/commit_hook.html
-pollAndNotifyOnChange ::
+watchForChanges ::
        (TimeUnit t, Eq a, Member DelayEffect effs)
     => t
     -> Eff effs a
     -> (a -> Eff effs ())
     -> Eff effs ()
-pollAndNotifyOnChange time query notify = go Nothing
+watchForChanges time query notify = go Nothing
   where
     go oldValue = do
         newValue <- query
@@ -99,6 +112,7 @@ threadApp config connection = do
             asyncApp
             [ chainReportThread connection
             , contractStateThread connection
+            , eventsThread connection
             ]
     void $ waitAnyCancel tasks
   where

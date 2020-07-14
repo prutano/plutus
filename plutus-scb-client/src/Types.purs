@@ -3,6 +3,7 @@ module Types where
 import Prelude
 import Chain.Types as Chain
 import Control.Monad.Gen as Gen
+import Data.Bifunctor (lmap)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Json.JsonMap (JsonMap)
@@ -23,6 +24,8 @@ import Ledger.Index (UtxoIndex)
 import Ledger.Tx (Tx)
 import Ledger.TxId (TxId)
 import Network.RemoteData (RemoteData)
+import Network.StreamData (StreamData)
+import Network.StreamData as Stream
 import Playground.Types (FunctionSchema)
 import Plutus.SCB.Events (ChainEvent)
 import Plutus.SCB.Events.Contract (ContractInstanceId, ContractInstanceState, ContractSCBRequest, PartiallyDecodedResponse, _ContractInstanceState, _UserEndpointRequest)
@@ -41,8 +44,18 @@ data Query a
 data Output
   = SendWebSocketMessage (WS.Input StreamToServer)
 
+data StreamError
+  = DecodingError MultipleErrors
+  | TransportError AjaxError
+
+type WebStreamData
+  = StreamData StreamError
+
 type WebData
   = RemoteData AjaxError
+
+fromWebData :: forall a. WebData a -> WebStreamData a
+fromWebData = Stream.fromRemoteData <<< lmap TransportError
 
 data HAction
   = Init
@@ -53,15 +66,21 @@ data HAction
   | ChangeContractEndpointCall ContractInstanceId Int FormEvent
   | InvokeContractEndpoint ContractInstanceId EndpointForm
 
+type ContractStates
+  = Map ContractInstanceId (WebStreamData (ContractInstanceState ContractExe /\ Array EndpointForm))
+
+type ContractSignatures
+  = Array (ContractSignatureResponse ContractExe)
+
 newtype State
   = State
   { currentView :: View
-  , contractSignatures :: WebData (Array (ContractSignatureResponse ContractExe))
+  , contractSignatures :: WebStreamData ContractSignatures
   , chainReport :: WebData (ChainReport ContractExe)
   , events :: WebData (Array (ChainEvent ContractExe))
   , chainState :: Chain.State
-  , contractStates :: Map ContractInstanceId (WebData (ContractInstanceState ContractExe /\ Array EndpointForm))
-  , webSocketMessage :: RemoteData MultipleErrors StreamToClient
+  , contractStates :: ContractStates
+  , webSocketMessage :: WebStreamData StreamToClient
   }
 
 type EndpointForm
@@ -88,7 +107,7 @@ _events = _Newtype <<< prop (SProxy :: SProxy "events")
 _chainState :: Lens' State Chain.State
 _chainState = _Newtype <<< prop (SProxy :: SProxy "chainState")
 
-_contractStates :: Lens' State (Map ContractInstanceId (WebData (ContractInstanceState ContractExe /\ Array EndpointForm)))
+_contractStates :: Lens' State (Map ContractInstanceId (WebStreamData (ContractInstanceState ContractExe /\ Array EndpointForm)))
 _contractStates = _Newtype <<< prop (SProxy :: SProxy "contractStates")
 
 _annotatedBlockchain :: forall t. Lens' (ChainReport t) (Array (Array AnnotatedTx))
