@@ -40,6 +40,7 @@ library
         Language.PlutusTx.Coordination.Contracts.PubKey
         Language.PlutusTx.Coordination.Contracts.Vesting
         Language.PlutusTx.Coordination.Contracts.Swap
+        Language.PlutusTx.Coordination.Contracts.Top
     hs-source-dirs: src
     default-language: Haskell2010
     default-extensions: ExplicitForAll ScopedTypeVariables
@@ -94,6 +95,7 @@ test-suite plutus-use-cases-test
         Spec.Rollup
         Spec.TokenAccount
         Spec.Vesting
+        Spec.Top
     default-language: Haskell2010
     ghc-options: -Wall -Wnoncanonical-monad-instances
                  -Wincomplete-uni-patterns -Wincomplete-record-updates

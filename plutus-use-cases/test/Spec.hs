@@ -14,6 +14,7 @@ import qualified Spec.PingPong
 import qualified Spec.PubKey
 import qualified Spec.Rollup
 import qualified Spec.TokenAccount
+import qualified Spec.Top
 import qualified Spec.Vesting
 import           Test.Tasty
 import           Test.Tasty.Hedgehog       (HedgehogTestLimit (..))
@@ -43,5 +44,6 @@ tests = localOption limit $ testGroup "use cases" [
     Spec.GameStateMachine.tests,
     Spec.Rollup.tests,
     Spec.TokenAccount.tests,
-    Spec.PingPong.tests
+    Spec.PingPong.tests,
+    Spec.Top.tests
     ]
